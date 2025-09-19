@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Professional Portfolio Tracker</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial@3.3.0"></script>
+  <style>
+    :root{
+      --bg:#050608;
+      --card: rgba(255,255,255,0.04);
+      --muted:#9ca3af;
+      --accent:#60a5fa;
+      --accent-2:#22c55e;
+      --glass-border: rgba(255,255,255,0.06);
+      --glass-shadow: 0 10px 30px rgba(2,6,23,0.7);
+    }
+    html,body{height:100%}
+    body{
+      background: linear-gradient(180deg,#020204 0%, #071124 100%);
+      color:#e6eef8;
+      font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial;
+      margin:0;
+      padding:0;
+    }
+    .navbar-brand { font-weight:700; color:var(--accent); }
+    .container-xl{padding-top:28px;padding-bottom:48px}
+    .glass {
+      background: var(--card);
+      border-radius:14px;
+      border:1px solid var(--glass-border);
+      box-shadow:var(--glass-shadow);
+      backdrop-filter: blur(10px) saturate(120%);
+      padding:18px;
+    }
+    .controls select, .controls input { background: rgba(0,0,0,0.7); color: #e6eef8; border:1px solid rgba(255,255,255,0.06); border-radius:8px; padding:8px 10px; }
+    .btn-accent { background: linear-gradient(90deg,var(--accent), #7dd3fc); color:#050608; font-weight:600; border-radius:10px; border:none; padding:8px 14px; }
+    .muted { color:var(--muted); font-size:0.9rem; }
+    .flex-gap { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+    .asset-row { display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px dashed rgba(255,255,255,0.03); }
+    .asset-left { display:flex; gap:12px; align-items:center; }
+    .asset-name { font-weight:600; }
+    .small { font-size:0.85rem; color:var(--muted); }
+    footer{text-align:center; color:var(--muted); margin-top:28px}
+    @media (max-width: 767px){
+      .flex-gap{flex-direction:column; align-items:stretch}
+    }
+    .last-updated { font-size:0.85rem; color:var(--muted); margin-left:10px; }
+  </style>
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark bg-transparent px-4">
+  <a class="navbar-brand" href="#">PortfolioTracker</a>
+  <div class="ms-auto muted">In-memory demo • Professional UI</div>
+</nav>
+
+<div class="container-xl">
+  <div class="row g-4">
+    <div class="col-12">
+      <div class="glass d-flex justify-content-between align-items-center">
+        <div>
+          <h3 style="margin:0">Overview</h3>
+          <div class="muted">Add assets with dropdowns; charts update automatically.</div>
+        </div>
+        <div class="d-flex align-items-center">
+          <div class="muted me-3">Last refresh:</div>
+          <div id="lastRefresh" class="last-updated">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4 col-md-6">
+      <div class="glass">
+        <h5 style="margin-bottom:12px">Add Stock</h5>
+        <div class="controls flex-gap">
+          <select id="stockSelect">
+            {% for sym,name in stocks %}
+            <option value="{{ sym }}">{{ name }} ({{ sym }})</option>
+            {% endfor %}
+          </select>
+          <input id="stockQty" type="number" placeholder="Quantity" min="0" step="any"/>
+          <input id="stockAvg" type="number" placeholder="Avg cost" min="0" step="any"/>
+          <button class="btn-accent" onclick="addStock()">Add</button>
+        </div>
+        <div style="margin-top:12px">
+          <div class="muted">Your stocks</div>
+          <div id="stocksList"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4 col-md-6">
+      <div class="glass">
+        <h5 style="margin-bottom:12px">Add Coin</h5>
+        <div class="controls flex-gap">
+          <select id="coinSelect">
+            {% for id,sym,name in coins %}
+            <option value="{{ id }}|{{ sym }}|{{ name }}">{{ name }} ({{ sym }})</option>
+            {% endfor %}
+          </select>
+          <input id="coinQty" type="number" placeholder="Quantity" min="0" step="any"/>
+          <input id="coinAvg" type="number" placeholder="Avg cost" min="0" step="any"/>
+          <button class="btn-accent" onclick="addCoin()">Add</button>
+        </div>
+        <div style="margin-top:12px">
+          <div class="muted">Your coins</div>
+          <div id="coinsList"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4 col-md-12">
+      <div class="glass">
+        <h5 style="margin-bottom:12px">Charts & Export</h5>
+        <div class="muted">Stocks (blue) • Coins (green)</div>
+        <div style="margin-top:12px" class="d-flex gap-2 flex-wrap">
+          <button class="btn btn-sm btn-outline-light" onclick="download('stocks','csv')">Stocks CSV</button>
+          <button class="btn btn-sm btn-outline-light" onclick="download('stocks','pdf')">Stocks PDF</button>
+          <button class="btn btn-sm btn-outline-light" onclick="download('coins','csv')">Coins CSV</button>
+          <button class="btn btn-sm btn-outline-light" onclick="download('coins','pdf')">Coins PDF</button>
+        </div>
+        <div style="margin-top:16px">
+          <div class="muted">Click a dropdown item to update its candlestick chart</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12">
+      <div class="glass">
+        <div class="row">
+          <div class="col-lg-6">
+            <h6>Stocks Value</h6>
+            <canvas id="stocksBar" height="120"></canvas>
+            <h6 style="margin-top:12px">Stock Candlestick</h6>
+            <canvas id="stockCandle" height="220"></canvas>
+          </div>
+          <div class="col-lg-6">
+            <h6>Coins Value</h6>
+            <canvas id="coinsBar" height="120"></canvas>
+            <h6 style="margin-top:12px">Coin Candlestick</h6>
+            <canvas id="coinCandle" height="220"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <footer>
+    <div class="muted">Made professional • Demo in-memory app</div>
+  </footer>
+</div>
+
+<script>
+let stocksBar, coinsBar, stockCandle, coinCandle;
+let currentStock = "AAPL";
+let currentCoin = "bitcoin";
+let lastRefreshTS = null;
+
+function fmtTime(ts){
+  const d = new Date(ts * 1000);
+  return d.toLocaleString();
+}
+
+async function fetchPortfolio(){
+  try{
+    const r = await fetch('/api/portfolio');
+    const j = await r.json();
+    renderLists(j);
+    renderBars(j);
+    lastRefreshTS = j.timestamp || Math.floor(Date.now()/1000);
+    document.getElementById('lastRefresh').innerText = fmtTime(lastRefreshTS);
+  }catch(e){
+    console.error(e);
+  }
+}
+
+function renderLists(j){
+  const s = j.stocks || [];
+  const c = j.crypto || [];
+  const stocksList = document.getElementById('stocksList'); stocksList.innerHTML = '';
+  s.forEach(item=>{
+    const row = document.createElement('div'); row.className='asset-row';
+    row.innerHTML = `<div class="asset-left"><div class="asset-name">${item.name}</div><div class="small"> ${item.symbol}</div></div>
+      <div><div class="small">Qty: ${item.quantity}</div><div class="small">Val: $${(item.value||0).toFixed(2)}</div></div>
+      <div><button class="btn btn-sm btn-outline-light" onclick="removeStock('${item.symbol}')">Remove</button></div>`;
+    stocksList.appendChild(row);
+  });
+  const coinsList = document.getElementById('coinsList'); coinsList.innerHTML = '';
+  c.forEach(item=>{
+    const row = document.createElement('div'); row.className='asset-row';
+    row.innerHTML = `<div class="asset-left"><div class="asset-name">${item.name}</div><div class="small"> ${item.symbol}</div></div>
+      <div><div class="small">Qty: ${item.quantity}</div><div class="small">Val: $${(item.value||0).toFixed(2)}</div></div>
+      <div><button class="btn btn-sm btn-outline-light" onclick="removeCoin('${item.id}')">Remove</button></div>`;
+    coinsList.appendChild(row);
+  });
+}
+
+function renderBars(j){
+  const s = j.stocks || []; const c = j.crypto || [];
+  const sLabels = s.map(x=>x.symbol || x.name); const sData = s.map(x=>x.value || 0);
+  const cLabels = c.map(x=>x.symbol || x.name); const cData = c.map(x=>x.value || 0);
+  const ctxS = document.getElementById('stocksBar').getContext('2d');
+  if(stocksBar) stocksBar.destroy();
+  stocksBar = new Chart(ctxS, {type:'bar', data:{labels:sLabels, datasets:[{label:'Value ($)', data:sData, backgroundColor:'#3b82f6'}]}, options:{responsive:true, plugins:{legend:{display:false}}, scales:{y:{ticks:{color:'#cbd5e1'}, beginAtZero:true}, x:{ticks:{color:'#cbd5e1'}}}}});
+  const ctxC = document.getElementById('coinsBar').getContext('2d');
+  if(coinsBar) coinsBar.destroy();
+  coinsBar = new Chart(ctxC, {type:'bar', data:{labels:cLabels, datasets:[{label:'Value ($)', data:cData, backgroundColor:'#22c55e'}]}, options:{responsive:true, plugins:{legend:{display:false}}, scales:{y:{ticks:{color:'#cbd5e1'}, beginAtZero:true}, x:{ticks:{color:'#cbd5e1'}}}}});
+}
+
+async function loadStockCandle(sym){
+  currentStock = sym;
+  try{
+    const res = await fetch(`/api/stock_ohlc/${sym}`);
+    const j = await res.json();
+    const data = j.data || [];
+    const ctx = document.getElementById('stockCandle').getContext('2d');
+    if(stockCandle) stockCandle.destroy();
+    stockCandle = new Chart(ctx, {type:'candlestick', data:{datasets:[{label:sym, data:data}]}, options:{plugins:{legend:{labels:{color:'#cbd5e1'}}}, scales:{x:{ticks:{color:'#cbd5e1'}}, y:{ticks:{color:'#cbd5e1'}}}}});
+  }catch(e){ console.error(e); }
+}
+
+async function loadCoinCandle(id_){
+  currentCoin = id_;
+  try{
+    const res = await fetch(`/api/crypto_ohlc/${id_}`);
+    const j = await res.json();
+    const data = j.data || [];
+    const ctx = document.getElementById('coinCandle').getContext('2d');
+    if(coinCandle) coinCandle.destroy();
+    coinCandle = new Chart(ctx, {type:'candlestick', data:{datasets:[{label:id_.toUpperCase(), data:data}]}, options:{plugins:{legend:{labels:{color:'#cbd5e1'}}}, scales:{x:{ticks:{color:'#cbd5e1'}}, y:{ticks:{color:'#cbd5e1'}}}}});
+  }catch(e){ console.error(e); }
+}
+
+async function addStock(){
+  const sym = document.getElementById('stockSelect').value;
+  const qty = parseFloat(document.getElementById('stockQty').value) || 0;
+  const avg = parseFloat(document.getElementById('stockAvg').value) || 0;
+  if(!sym || qty<=0) return alert('Select stock and quantity');
+  await fetch('/api/add_stock',{method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({symbol:sym, name: sym, quantity: qty, avgCost: avg})});
+  document.getElementById('stockQty').value=''; document.getElementById('stockAvg').value='';
+  await fetchPortfolio();
+  await loadStockCandle(sym);
+}
+
+async function addCoin(){
+  const raw = document.getElementById('coinSelect').value.split('|');
+  const id_ = raw[0]; const sym = raw[1]; const name = raw[2];
+  const qty = parseFloat(document.getElementById('coinQty').value) || 0;
+  const avg = parseFloat(document.getElementById('coinAvg').value) || 0;
+  if(!id_ || qty<=0) return alert('Select coin and quantity');
+  await fetch('/api/add_crypto',{method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id:id_, symbol: sym, name:name, quantity: qty, avgCost: avg})});
+  document.getElementById('coinQty').value=''; document.getElementById('coinAvg').value='';
+  await fetchPortfolio();
+  await loadCoinCandle(id_);
+}
+
+async function removeStock(sym){
+  await fetch(`/api/remove_stock/${encodeURIComponent(sym)}`, {method:'POST'});
+  await fetchPortfolio();
+}
+
+async function removeCoin(id_){
+  await fetch(`/api/remove_crypto/${encodeURIComponent(id_)}`, {method:'POST'});
+  await fetchPortfolio();
+}
+
+function download(type_, fmt){
+  window.location = `/download/${type_}/${fmt}`;
+}
+
+fetchPortfolio();
+loadStockCandle(currentStock);
+loadCoinCandle(currentCoin);
+
+setInterval(async ()=>{
+  await fetchPortfolio();
+  await loadStockCandle(currentStock);
+  await loadCoinCandle(currentCoin);
+}, 30000);
+</script>
+</body>
+</html>
